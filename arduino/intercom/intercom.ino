@@ -8,6 +8,11 @@
  *  
 */
 #include <LiquidCrystal.h>
+#include <Servo.h>
+//Voor de servo
+const int SERVO_PIN = 12;
+String door;
+Servo servo;
 // Voor de leds
 const byte RGB_RED_PIN = 11;
 const byte RGB_YELLOW_PIN = 10;
@@ -72,14 +77,32 @@ void setLCD(String command) {
 void setBuzzer(String command) {
   int location = command.indexOf(":"); 
   String frequency = command.substring(0, location);
-  String duration = command.substring(location + 1, command.length());    
-  Serial.println(frequency + "  " + duration);  
+  String duration = command.substring(location + 1, command.length());     
   tone(BUZZER_PIN, frequency.toInt(), duration.toInt());
 }
 
+// Uitgangspunt bij start van het programma is dat de 
+// deur gesloten is. 
+void setDoor(String command) {
+  if (command == "open" && door == "closed") {
+    servo.write(90);
+    door = "opened";
+  } else if (command == "close" && door == "opened") {
+    servo.write(0);
+    door = "closed";
+  } else {
+    // do nothing
+  }
+}
+
+
 void setup() {
-  // Algemeen
+  // voor de communicatie
   Serial.begin(115200);
+  // voor de servo
+  servo.attach(SERVO_PIN);  
+  servo.write(0);
+  door = "closed";
   // voor de buzzer
   pinMode(BUZZER_PIN, OUTPUT);
   // Voor de leds
@@ -90,6 +113,7 @@ void setup() {
   // Voor de LCD
   lcd.begin(16, 2);
   lcd.clear();
+  
   
 
   /* initieer hier een initiele presentatie van het systeem door 
@@ -104,16 +128,22 @@ void loop() {
   delay(10);
   if (Serial.available() > 0) {
     String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
     if (cmd.startsWith("led:")) {
-      cmd.remove(0, 4);
+      int colonIndex = cmd.indexOf(":");
+      cmd.remove(0, colonIndex + 1);
       setLed(cmd);
     } else if (cmd.startsWith("lcd:")) {
-      cmd.remove(0, 4);
+      int colonIndex = cmd.indexOf(":");
+      cmd.remove(0, colonIndex + 1);
       setLCD(cmd);
     } else if (cmd.startsWith("buzz:")) {
-      cmd.remove(0, 5);
+      int colonIndex = cmd.indexOf(":");
+      cmd.remove(0, colonIndex + 1);
       setBuzzer(cmd);
+    } else if (cmd.startsWith("door:")) {
+      int colonIndex = cmd.indexOf(":");
+      cmd.remove(0, colonIndex + 1);
+      setDoor(cmd);
     } else {
       // do nothing
     }
