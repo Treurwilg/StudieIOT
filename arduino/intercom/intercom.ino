@@ -9,7 +9,14 @@
 */
 #include <LiquidCrystal.h>
 #include <Servo.h>
-//Voor de servo
+// Voor de button
+const byte BUTTON_PIN = 7;
+byte previousButtonState;
+bool buttonPressed;
+bool messageSent;
+unsigned long lastTimeStateChanged = millis();
+unsigned long buttonDebounceDuration = 20;
+//Voor de servo van de deur
 const int SERVO_PIN = 12;
 String door;
 Servo servo;
@@ -95,10 +102,54 @@ void setDoor(String command) {
   }
 }
 
+void checkButton() {
+  unsigned long timeNow = millis();
+  if(timeNow - lastTimeStateChanged >= buttonDebounceDuration) {
+    byte buttonState = digitalRead(BUTTON_PIN);
+    if(buttonState != previousButtonState) {
+      lastTimeStateChanged = timeNow;
+      previousButtonState = buttonState;
+      if (buttonState == HIGH) {
+        buttonPressed = true;
+      }
+    }
+  }
+}
+
+void respond(String cmd) { //reactie op de call
+  unsigned long timeNow = millis();
+  if (cmd == "open") {
+    setDoor("open");
+    setLed("GREEN");
+    setBuzzer("1000:1000");
+    setLCD("0:0:Door is opened");
+    while ((millis() - timeNow) < 10000) {}
+    setDoor("close");
+    setLed("YELLOW");
+    setBuzzer("3000:1000");
+    setLCD("0:0:Press button");
+    setLCD("7:1:to call.");
+  } else if ( cmd = "deny") {
+    unsigned long timeNow = millis();
+    setLed("RED");
+    setBuzzer("2000:2000");
+    setLCD("0:0:Access denied");
+    while ((millis() - timeNow) < 5000) {}
+    setLed("YELLOW");
+    setLCD("0:0:Press button");
+    setLCD("7:1:to call.");    
+  }
+}
+
 
 void setup() {
   // voor de communicatie
-  Serial.begin(115200);
+  Serial.begin(115200); 
+  // voor de button
+  pinMode(BUTTON_PIN,INPUT);
+  previousButtonState = digitalRead(BUTTON_PIN);
+  buttonPressed = false;
+  messageSent = false;
   // voor de servo
   servo.attach(SERVO_PIN);  
   servo.write(0);
@@ -109,11 +160,15 @@ void setup() {
   pinMode(RGB_RED_PIN, OUTPUT);
   pinMode(RGB_YELLOW_PIN, OUTPUT);
   pinMode(RGB_GREEN_PIN, OUTPUT);
-  switchOffLeds();
+    switchOffLeds();
   // Voor de LCD
   lcd.begin(16, 2);
   lcd.clear();
-  
+  // voor de initial state van de deur
+  setDoor("close");
+  setLed("YELLOW");
+  setLCD("0:0:Press button");
+  setLCD("7:1:to call.");   
   
 
   /* initieer hier een initiele presentatie van het systeem door 
@@ -144,8 +199,25 @@ void loop() {
       int colonIndex = cmd.indexOf(":");
       cmd.remove(0, colonIndex + 1);
       setDoor(cmd);
+    } else if (cmd.startsWith("respond")) {
+      int colonIndex = cmd.indexOf(":");
+      cmd.remove(0, colonIndex + 1);
+      respond(cmd);
+      buttonPressed = false;
+      messageSent = false;          
     } else {
       // do nothing
     }
   }
+  checkButton();
+  if (buttonPressed == true ) {
+    if ( !messageSent )  {
+    Serial.println("caller"); // wordt gelezen door de pi
+    messageSent = true;
+    // buttonPressed wordt na de deurprocedure weer op false gezet
+    // zodat niet tijdens de procedure opnieuw gebeld wordt.
+    // idem voor messageSent.Dit zorgt ervoor dat eenmaal de boodschap wordt
+    // verstuurd en niet in elke loop.
+    }
+  } 
 }
