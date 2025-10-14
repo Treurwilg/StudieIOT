@@ -4,7 +4,7 @@
  *  Arduino UNO, en Telegram. Ik doe dit aan de hand van al eerder uitgevoerde projecten
  *  voor de elementen ten behoeve van de aansturing LED's, LCD, BUZZER, SERVO, de verwerking
  *  van BUTTON, de communicatie tussen Arduino en RaspberryPI en die tussen de RaspberryPi
- *  en Telegram. Op de RaspberryPi is daarnaast de mogelijkheid om foto's te nemen.
+ *  en Telegram. Op de RaspberryPi komt daarnaast de mogelijkheid om foto's te nemen.
  *  
 */
 #include <LiquidCrystal.h>
@@ -79,7 +79,7 @@ void setLCD(String command) {
 }
 
 /*
- * Format command is: "frequncy:duration"
+ * Format command is: "frequency:duration"
  */
 void setBuzzer(String command) {
   int location = command.indexOf(":"); 
@@ -116,9 +116,9 @@ void checkButton() {
   }
 }
 
-void respond(String cmd) { //reactie op de call
+void respond(String command) { //reactie op de call
   unsigned long timeNow = millis();
-  if (cmd == "open") {
+  if (command == "open") {
     setDoor("open");
     setLed("GREEN");
     setBuzzer("1000:1000");
@@ -129,7 +129,8 @@ void respond(String cmd) { //reactie op de call
     setBuzzer("3000:1000");
     setLCD("0:0:Press button");
     setLCD("7:1:to call.");
-  } else if ( cmd = "deny") {
+    Serial.println("closed");
+  } else if ( command = "deny") {
     unsigned long timeNow = millis();
     setLed("RED");
     setBuzzer("2000:2000");
@@ -137,10 +138,20 @@ void respond(String cmd) { //reactie op de call
     while ((millis() - timeNow) < 5000) {}
     setLed("YELLOW");
     setLCD("0:0:Press button");
-    setLCD("7:1:to call.");    
+    setLCD("7:1:to call.");
+    Serial.println("waiting");   
+  } else {
+    // do nothing
   }
 }
 
+void setDoorWaiting() {
+  setDoor("close");
+  setLed("YELLOW");
+  setLCD("0:0:Press button");
+  setLCD("7:1:to call.");
+  Serial.println("waiting");
+}
 
 void setup() {
   // voor de communicatie
@@ -160,15 +171,13 @@ void setup() {
   pinMode(RGB_RED_PIN, OUTPUT);
   pinMode(RGB_YELLOW_PIN, OUTPUT);
   pinMode(RGB_GREEN_PIN, OUTPUT);
-    switchOffLeds();
+  switchOffLeds();
   // Voor de LCD
   lcd.begin(16, 2);
   lcd.clear();
   // voor de initial state van de deur
-  setDoor("close");
-  setLed("YELLOW");
-  setLCD("0:0:Press button");
-  setLCD("7:1:to call.");   
+  setDoorWaiting(); 
+  
   
 
   /* initieer hier een initiele presentatie van het systeem door 
@@ -199,7 +208,7 @@ void loop() {
       int colonIndex = cmd.indexOf(":");
       cmd.remove(0, colonIndex + 1);
       setDoor(cmd);
-    } else if (cmd.startsWith("respond")) {
+    } else if (cmd.startsWith("respond:")) {
       int colonIndex = cmd.indexOf(":");
       cmd.remove(0, colonIndex + 1);
       respond(cmd);
