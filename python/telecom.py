@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 ''' In dit programma wordt het Python-deel van de eindopdracht
     van de Udemy cursus RaspberryPi en Arduino uitgewerkt. Python op de RaspberryPi
-    Het deel van Arduino is al klaar om commands te verwerken. 
+    Het deel van Arduino is klaar om commands te verwerken. 
     
     Arduino verzorgt startsituatie met deur gesloten, gele led aan,
     "Press button to call" op LCD, deur gesloten.
@@ -12,12 +12,14 @@
     "/deny"? op de Telegram-chat , nadat er een foto is gemaakt die ook naar
     de chat stuurt zodat de huismeester aan de hand van de foto kan kiezen.
     De van de huismeester wordt met respond:open of respond:deny beantwoord.
-    Zover werkt dit programma nu. Nog toe te voegen is het nemen en verzenden naar
-    de chat tegelijk met de vraag /open of /deny.
+    Zover werkt dit programma nu. Nog toe te voegen is het nemen en verzenden
+    van een foto naar de chat tegelijk met de vraag /open of /deny.
     Er worden nog testberichten naar de Shell gestuurd.
 '''
 import serial
 import time
+import os
+from picamera2 import Picamera2
 from telegram import Bot
 from telegram.ext import Updater, CommandHandler
 with open("/etc/environment", "r") as f:
@@ -45,7 +47,7 @@ def deny_handler(update, context):
         strToSend = "respond:deny\n".encode('utf-8')
         ser.write(strToSend)
         context.bot.send_message(chat_id=update.effective_chat.id, text="Keep closed")
-        chat_cmd_used = True
+        chat_cmd_used = True                         
     
 with open("/home/jan/.local/share/.t_bot_token", "r") as f:
     telegram_token = f.read().rstrip()
@@ -57,6 +59,17 @@ dispatcher.add_handler(CommandHandler('open', open_handler))
 dispatcher.add_handler(CommandHandler('deny', deny_handler))
 updater.start_polling() #in his own thread # we are being updated if something is sent
 print("Telegram bot ready")
+
+camera = Picamera2() # anders dan in de cursus
+camera.resolution = (640, 480)
+camera.rotation = 180
+image_folder_name = "/home/jan/camera"
+if not os.path.exists(image_folder_name):
+    os.mkdir(image_folder_name)
+image_file_name = image_folder_name + "/photo.jpg" # vorige photo is overschreven
+camera.start()
+time.sleep(3)  # camera needs to adjust to luminosity and serial
+print("Camera OK")             # needs to organize itself
 
 while True:
     try:
@@ -75,6 +88,9 @@ try:
         while ser.in_waiting <= 0:
             time.sleep(0.01)
         alarm = ser.readline().decode('utf-8').rstrip()
+        camera.capture_file(image_file_name)
+        with open(image_file_name, 'rb') as photo:
+            bot.send_photo(chat_id=chat_id, photo=photo)
         print(alarm)
         if (alarm == "caller"):
             print("Send message to chat")
@@ -90,3 +106,4 @@ except KeyboardInterrupt:
     print("Manager stopped telecom program.")
     bot.send_message(chat_id=chat_id, text="I stopped telecom service")
     ser.close()
+    updater.stop()
