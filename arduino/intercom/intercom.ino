@@ -155,7 +155,11 @@ void setDoorWaiting() {
 
 void setup() {
   // voor de communicatie
-  Serial.begin(115200); 
+  Serial.begin(115200);
+  while (!Serial) {} // voor compatibiliteit met andere Arduino boards
+  while(Serial.available() > 0) {
+    Serial.read(); // om zeker te zijn dat de input buffer leeg is 
+  }
   // voor de button
   pinMode(BUTTON_PIN,INPUT);
   previousButtonState = digitalRead(BUTTON_PIN);
@@ -215,7 +219,9 @@ void loop() {
       buttonPressed = false;
       messageSent = false;          
     } else {
-      // do nothing
+      while (Serial.available() > 0) {
+        Serial.read(); // als een verkeerd bericht is ontvangen wil je buffer weer leeg
+      }
     }
   }
   checkButton();
